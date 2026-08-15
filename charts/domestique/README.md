@@ -70,6 +70,32 @@ never from `config`. An optional, separate `DOMESTIQUE_AUTH0_MGMT_CLIENT_ID` /
 admin People page for inviting riders and managing access — without it the
 page is simply unavailable, not broken.
 
+## Exposing it: Traefik or a plain Ingress
+
+**Running Traefik? `ingressRoute` is the supported path, and TLS needs no
+extra tooling.** `ingressRoute.tls.certResolver` names a resolver your
+Traefik already has configured — set it and Traefik handles the ACME
+handshake itself, no cert-manager or other TLS controller involved:
+
+```yaml
+ingressRoute:
+  enabled: true
+  match: "Host(`domestique.example.com`)"
+  tls:
+    certResolver: cloudflare   # whatever your own Traefik already has
+```
+
+This is exactly how the chart's own reference deployment runs — see
+[`wncservices/lab`'s Traefik conventions](https://github.com/wncservices/lab/blob/master/AGENTS.md)
+for the shape (`certResolver: cloudflare`, an `internal` middleware for
+IP-restricted services).
+
+**Not running Traefik?** `ingress` renders a plain `networking.k8s.io/v1
+Ingress` instead, bring-your-own TLS via `ingress.tls` and whatever your
+ingress controller and cert issuer already expect (cert-manager annotations
+go in `ingress.annotations`, same as any other chart) — the chart has no
+opinion on that combination and no code path specific to it.
+
 ## PostgreSQL, and no volume
 
 Routes, sync state, linked head units and Komoot sign-ins are all rows in one
