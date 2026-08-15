@@ -1,0 +1,99 @@
+{{- if .Values.backup.enabled -}}
+{{- $pvc := .Values.backup.destination.pvc.claimName -}}
+{{- $s3 := .Values.backup.destination.existingSecret -}}
+{{- if and (not $pvc) (not $s3) -}}
+{{- fail "backup.enabled is true but neither backup.destination.pvc.claimName nor backup.destination.existingSecret is set — pick exactly one" -}}
+{{- end -}}
+{{- if and $pvc $s3 -}}
+{{- fail "backup.destination.pvc.claimName and backup.destination.existingSecret are both set — pick exactly one destination" -}}
+{{- end -}}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "domestique.fullname" . }}-backup
+  labels:
+    {{- include "domestique.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.backup.schedule | quote }}
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            {{- include "domestique.selectorLabels" . | nindent 12 }}
+        spec:
+          restartPolicy: OnFailure
+          {{- if $s3 }}
+          # pg_dump and an S3 client do not both live in one image: dump to
+          # a shared emptyDir first, upload it second. initContainers run to
+          # completion before the main container starts, which is exactly
+          # the ordering this needs.
+          initContainers:
+            - name: dump
+              image: "{{ .Values.backup.image.repository }}:{{ .Values.backup.image.tag }}"
+              env:
+                - name: DOMESTIQUE_SOURCE_DSN
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "domestique.databaseSecret" . }}
+                      key: {{ include "domestique.databaseSecretKey" . }}
+              command:
+                - sh
+                - -c
+                - |
+                  set -eu
+                  pg_dump "$DOMESTIQUE_SOURCE_DSN" | gzip > /backup/dump.sql.gz
+              volumeMounts:
+                - name: backup
+                  mountPath: /backup
+          containers:
+            - name: upload
+              image: minio/mc:latest
+              # Secret must carry exactly these four keys — envFrom names
+              # the env vars after them, and the script below reads them by
+              # those same names.
+              envFrom:
+                - secretRef:
+                    name: {{ $s3 }}
+              command:
+                - sh
+                - -c
+                - |
+                  set -eu
+                  mc alias set backup "$endpoint" "$accessKeyId" "$secretAccessKey"
+                  ts=$(date +%Y%m%d-%H%M%S)
+                  mc cp /backup/dump.sql.gz "backup/$bucket/domestique-$ts.sql.gz"
+              volumeMounts:
+                - name: backup
+                  mountPath: /backup
+                  readOnly: true
+          volumes:
+            - name: backup
+              emptyDir: {}
+          {{- else }}
+          containers:
+            - name: backup
+              image: "{{ .Values.backup.image.repository }}:{{ .Values.backup.image.tag }}"
+              env:
+                - name: DOMESTIQUE_SOURCE_DSN
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "domestique.databaseSecret" . }}
+                      key: {{ include "domestique.databaseSecretKey" . }}
+              command:
+                - sh
+                - -c
+                - |
+                  set -eu
+                  ts=$(date +%Y%m%d-%H%M%S)
+                  pg_dump "$DOMESTIQUE_SOURCE_DSN" | gzip > "/backup/domestique-$ts.sql.gz"
+                  find /backup -maxdepth 1 -name 'domestique-*.sql.gz' -mtime +{{ .Values.backup.retention }} -delete
+              volumeMounts:
+                - name: backup
+                  mountPath: /backup
+          volumes:
+            - name: backup
+              persistentVolumeClaim:
+                claimName: {{ $pvc }}
+          {{- end }}
+{{- end -}}
