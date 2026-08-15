@@ -102,13 +102,30 @@ env: []
 postgresql:
   # Name of a CloudNativePG Cluster in this namespace. The operator publishes
   # a Secret called <cluster>-app containing a ready-made connection string,
-  # and this reads it — nothing to copy, and it follows a failover.
+  # and this reads it — nothing to copy, and it follows a failover. Either
+  # bring your own (leave `enabled: false`, point `cluster` at it) or have
+  # this chart create it (`enabled: true`, see below) — either way the
+  # lookup is the same, because CNPG names that Secret identically either way.
   cluster: ""
 
   # Or point at any Secret holding a PostgreSQL URL. Takes precedence over
   # `cluster` when both are set.
   existingSecret: ""
   secretKey: uri
+
+  # Set true to have this chart create the CNPG Cluster named above, instead
+  # of requiring one to already exist. Requires the CNPG operator already
+  # installed in the target cluster — this does not install it, only creates
+  # a Cluster custom resource the operator then reconciles. `cluster` is
+  # still required when this is true: it becomes the created Cluster's name,
+  # deliberately not implicit, so there is one field controlling both which
+  # Cluster gets created and which Secret gets read.
+  enabled: false
+  instances: 1
+  storage:
+    size: 2Gi
+    # Empty uses the cluster's default StorageClass.
+    storageClass: ""
 
 # Encrypts Komoot sign-ins so riders can connect their own account from the
 # UI. Without it that form is not offered — a session is stored encrypted or

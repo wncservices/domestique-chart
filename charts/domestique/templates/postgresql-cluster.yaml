@@ -1,0 +1,33 @@
+{{- if .Values.postgresql.enabled -}}
+{{- if not .Values.postgresql.cluster -}}
+{{- fail "postgresql.enabled is true but postgresql.cluster is unset — it names the Cluster this creates, set it explicitly" -}}
+{{- end -}}
+# A single-tenant CloudNativePG Cluster, bootstrapped with one database and
+# owner named "domestique". CNPG's own bootstrap.initdb publishes a Secret
+# called <name>-app with a ready connection string — the exact shape
+# _helpers.tpl's domestique.databaseSecret already reads via postgresql.cluster,
+# so no other template needs to know this Cluster was chart-created rather
+# than pre-existing.
+#
+# Requires the CNPG operator already installed and watching this namespace.
+# helm template/lint cannot catch a missing operator — that only surfaces as
+# a real install failure, since the CRD this depends on comes from the
+# operator, not this chart.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ .Values.postgresql.cluster }}
+  labels:
+    {{- include "domestique.labels" . | nindent 4 }}
+spec:
+  instances: {{ .Values.postgresql.instances }}
+  bootstrap:
+    initdb:
+      database: domestique
+      owner: domestique
+  storage:
+    size: {{ .Values.postgresql.storage.size | quote }}
+    {{- with .Values.postgresql.storage.storageClass }}
+    storageClass: {{ . }}
+    {{- end }}
+{{- end -}}
