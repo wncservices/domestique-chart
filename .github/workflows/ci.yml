@@ -56,7 +56,7 @@ jobs:
           cache-dependency-path: domestique-app/apps/api/go.sum
       - name: The rendered config must be valid
         run: |
-          go build -o /tmp/domestique ./domestique-app/apps/api/cmd/domestique
+          (cd domestique-app/apps/api && go build -o /tmp/domestique ./cmd/domestique)
           for values in charts/domestique/ci/*-values.yaml; do
             helm template dom charts/domestique -f "$values" \
               --show-only templates/configmap.yaml \
