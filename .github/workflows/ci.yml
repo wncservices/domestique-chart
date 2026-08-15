@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  chart:
+    name: Helm chart
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+      - run: helm lint charts/domestique
+
+      # Rendering with no values must FAIL: PostgreSQL is required, and a
+      # chart that quietly fell back to SQLite would hand you a pod holding
+      # the only copy of the library on a disk nothing backs up. Assert the
+      # refusal rather than the render, or the guard could rot away unnoticed.
+      - name: Refuse to render without PostgreSQL
+        run: |
+          if helm template dom charts/domestique > /dev/null 2>/tmp/err; then
+            echo "the chart rendered without a database; it must not"
+            exit 1
+          fi
+          grep -q "domestique needs PostgreSQL" /tmp/err || {
+            echo "it failed, but not for the expected reason:"; cat /tmp/err; exit 1; }
+          echo "refused, as it should:"; cat /tmp/err
+
+      # Rendering is the part that catches real mistakes: a template that only
+      # breaks with ingress on, or values the app cannot parse.
+      - name: Render every example
+        run: |
+          for values in charts/domestique/ci/*-values.yaml; do
+            echo "rendering $values"
+            helm template dom charts/domestique -f "$values" > /dev/null
+          done
+
+      # The chart writes the app's config file, so a values change can produce
+      # something the app rejects. Check with the real binary — built from
+      # wncservices/Domestique's own source, since the chart now lives in a
+      # separate repo. Checked out at main: Domestique has no versioned v*
+      # release yet to pin this to (only chart releases exist so far), so
+      # this validates against the latest app code rather than a specific
+      # appVersion. Revisit once the app repo starts cutting real releases —
+      # pinning `ref:` to the tag matching Chart.yaml's appVersion would be
+      # the more precise check.
+      - uses: actions/checkout@v7
+        with:
+          repository: wncservices/Domestique
+          path: domestique-app
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: domestique-app/apps/api/go.mod
+          cache-dependency-path: domestique-app/apps/api/go.sum
+      - name: The rendered config must be valid
+        run: |
+          go build -o /tmp/domestique ./domestique-app/apps/api/cmd/domestique
+          for values in charts/domestique/ci/*-values.yaml; do
+            helm template dom charts/domestique -f "$values" \
+              --show-only templates/configmap.yaml \
+              | python3 -c "import sys,yaml; print(yaml.safe_load(sys.stdin)['data']['domestique.yaml'])" \
+              > /tmp/rendered.yaml
+            DOMESTIQUE_SOURCE_DSN=/tmp/check.db /tmp/domestique validate --config /tmp/rendered.yaml
+          done
