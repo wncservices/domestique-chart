@@ -1,4 +1,4 @@
-# domestique-chart
+# Domestique-chart
 
 The published Helm chart for [Domestique](https://github.com/wncservices/Domestique) — a shared
 cycling route library that syncs to Garmin and Wahoo head units. Free software under the
@@ -10,7 +10,7 @@ independently of the application's own release cycle — see
 values, and everything else about actually deploying it.
 
 ```bash
-helm repo add domestique https://wncservices.github.io/domestique-chart
+helm repo add domestique https://wncservices.github.io/Domestique-chart
 helm repo update
 ```
 
