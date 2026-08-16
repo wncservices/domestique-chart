@@ -119,6 +119,43 @@ encryptionKey:
   existingSecret: ""
   secretKey: DOMESTIQUE_ENCRYPTION_KEY
 
+# A scheduled `pg_dump` of whichever database `postgresql`/`envFrom` above
+# point at — this app has never taken its own backups, on purpose (see the
+# chart README), so this is an opt-in second system, not something the app
+# relies on existing. Off by default.
+#
+# Pick exactly one destination:
+backup:
+  enabled: false
+  schedule: "0 3 * * *"
+
+  # postgres:<tag> supplies pg_dump. Newer than the target server is the
+  # safe direction (pg_dump can read an older server; the reverse is not
+  # guaranteed), so default to something reasonably current rather than
+  # trying to match a version this chart cannot know.
+  image:
+    repository: postgres
+    tag: 16-alpine
+
+  destination:
+    # A PVC to dump into. Same container does the dump and prunes anything
+    # older than `retention` days — no second image needed for this path.
+    pvc:
+      claimName: ""
+
+    # OR: an S3-compatible endpoint. A Secret with keys endpoint, bucket,
+    # accessKeyId, secretAccessKey. Uploaded via a second, minio/mc
+    # container reading the dump from a shared emptyDir — pg_dump and an
+    # S3 client do not both live in one image, so this is two containers,
+    # not two chart features. `retention` is not applied here: most
+    # S3-compatible stores have their own bucket lifecycle rules for this,
+    # better suited to pruning object storage than a CronJob re-listing a
+    # bucket on every run.
+    existingSecret: ""
+
+  # Days of dumps to keep. Only applies to the pvc destination.
+  retention: 7
+
 service:
   type: ClusterIP
   port: 80
