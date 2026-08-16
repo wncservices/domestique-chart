@@ -41,11 +41,22 @@ postgresql:
 encryptionKey:
   existingSecret: domestique
 
-ingressRoute:
+# A generic Ingress, with Traefik-specific annotations to get TLS and a
+# middleware — the same resource any other ingress controller would use,
+# just with that controller's own annotations instead of these two.
+ingress:
   enabled: true
-  match: Host(`domestique.example.com`)
-  middlewares:
-    - name: internal
-      namespace: traefik
+  className: traefik
+  annotations:
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.tls.certresolver: letsencrypt
+    traefik.ingress.kubernetes.io/router.middlewares: traefik-internal@kubernetescrd
+  hosts:
+    - host: domestique.example.com
+      paths:
+        - path: /
+          pathType: Prefix
   tls:
-    certResolver: letsencrypt
+    - secretName: domestique-tls
+      hosts:
+        - domestique.example.com

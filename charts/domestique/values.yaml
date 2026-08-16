@@ -123,23 +123,19 @@ service:
   type: ClusterIP
   port: 80
 
-# A Traefik IngressRoute, which is how this is exposed in the cluster it was
-# written for. For a plain Ingress, see `ingress` below.
-ingressRoute:
-  enabled: false
-  entryPoints:
-    - websecure
-  # e.g. Host(`domestique.example.com`)
-  match: ""
-  middlewares: []
-  # - name: internal
-  #   namespace: traefik
-  # - name: authelia
-  #   namespace: authelia
-  tls:
-    certResolver: ""
-    secretName: ""
-
+# A plain networking.k8s.io/v1 Ingress — deliberately the only ingress
+# resource this chart offers, so it works with whatever controller a
+# cluster already has rather than assuming one. Empty className/annotations
+# by default for the same reason: a generic chart cannot guess at Traefik,
+# nginx, or anything else.
+#
+# Traefik users: no separate CRD needed. Traefik is a supported controller
+# for a standard Ingress via annotations —
+#   traefik.ingress.kubernetes.io/router.tls: "true"
+#   traefik.ingress.kubernetes.io/router.tls.certresolver: <your resolver>
+#   traefik.ingress.kubernetes.io/router.middlewares: <ns>-<name>@kubernetescrd
+# See charts/domestique/README.md and ci/full-values.yaml for a worked
+# example.
 ingress:
   enabled: false
   className: ""

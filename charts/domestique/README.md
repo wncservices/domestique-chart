@@ -6,7 +6,7 @@ cycling route library that syncs to Garmin and Wahoo head units.
 ## Install
 
 ```bash
-helm repo add domestique https://wncservices.github.io/domestique-chart
+helm repo add domestique https://wncservices.github.io/Domestique-chart
 helm repo update
 helm install domestique domestique/domestique \
   --namespace domestique --create-namespace
@@ -69,6 +69,51 @@ never from `config`. An optional, separate `DOMESTIQUE_AUTH0_MGMT_CLIENT_ID` /
 `_SECRET` pair (an Auth0 Management API M2M app, narrowly scoped) enables the
 admin People page for inviting riders and managing access — without it the
 page is simply unavailable, not broken.
+
+## Exposing it
+
+**One ingress resource, deliberately** — a plain `networking.k8s.io/v1
+Ingress`, so the chart works with whatever controller a cluster already has
+rather than assuming one:
+
+```yaml
+ingress:
+  enabled: true
+  className: traefik          # your ingress controller's class
+  hosts:
+    - host: domestique.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: domestique-tls
+      hosts: [domestique.example.com]
+```
+
+**Running Traefik?** No separate CRD needed — Traefik is a supported
+controller for a standard `Ingress`, via annotations instead of its own
+`IngressRoute`:
+
+```yaml
+ingress:
+  enabled: true
+  className: traefik
+  annotations:
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.tls.certresolver: cloudflare   # whatever resolver you already have
+    # traefik.ingress.kubernetes.io/router.middlewares: traefik-internal@kubernetescrd
+  hosts:
+    - host: domestique.example.com
+      paths: [{path: /, pathType: Prefix}]
+  tls:
+    - secretName: domestique-tls
+      hosts: [domestique.example.com]
+```
+
+Any other controller works the same way, with its own annotations in
+`ingress.annotations` — cert-manager's `cert-manager.io/cluster-issuer`,
+for instance. `ci/full-values.yaml` has the Traefik example above rendered
+in full, and CI renders it on every change.
 
 ## PostgreSQL, and no volume
 
@@ -164,8 +209,7 @@ from the Secrets named above; they do not go in `envFrom`.
 | `postgresql.existingSecret` | `""` | Any Secret holding a PostgreSQL URL; wins over `cluster` |
 | `postgresql.secretKey` | `uri` | Key within that Secret |
 | `encryptionKey.existingSecret` | `""` | Enables Komoot sign-in from the UI |
-| `ingressRoute.enabled` | `false` | Traefik `IngressRoute` |
-| `ingress.enabled` | `false` | Plain `Ingress`, as an alternative |
+| `ingress.enabled` | `false` | A plain `Ingress` — works with any controller, see **Exposing it** above |
 | `serviceAccount.name` | release name | Vault's Kubernetes auth binds to this |
 | `podDisruptionBudget.enabled` | `true` | `maxUnavailable: 1`, so node drains still work with one replica |
 | `automountServiceAccountToken` | `true` | Needed if the app authenticates to Vault |
