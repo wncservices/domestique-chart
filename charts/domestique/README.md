@@ -6,7 +6,7 @@ cycling route library that syncs to Garmin and Wahoo head units.
 ## Install
 
 ```bash
-helm repo add domestique https://wncservices.github.io/domestique-chart
+helm repo add domestique https://wncservices.github.io/Domestique-chart
 helm repo update
 helm install domestique domestique/domestique \
   --namespace domestique --create-namespace
