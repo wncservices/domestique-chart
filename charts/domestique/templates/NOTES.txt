@@ -1,9 +1,6 @@
 domestique {{ .Chart.AppVersion }} is installed as {{ include "domestique.fullname" . }}.
 
-{{- if .Values.ingressRoute.enabled }}
-
-  Reachable at: {{ .Values.ingressRoute.match }}
-{{- else if .Values.ingress.enabled }}
+{{- if .Values.ingress.enabled }}
 
   Reachable at:
   {{- range .Values.ingress.hosts }}
