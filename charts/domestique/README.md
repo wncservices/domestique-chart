@@ -70,6 +70,51 @@ never from `config`. An optional, separate `DOMESTIQUE_AUTH0_MGMT_CLIENT_ID` /
 admin People page for inviting riders and managing access — without it the
 page is simply unavailable, not broken.
 
+## Exposing it
+
+**One ingress resource, deliberately** — a plain `networking.k8s.io/v1
+Ingress`, so the chart works with whatever controller a cluster already has
+rather than assuming one:
+
+```yaml
+ingress:
+  enabled: true
+  className: traefik          # your ingress controller's class
+  hosts:
+    - host: domestique.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: domestique-tls
+      hosts: [domestique.example.com]
+```
+
+**Running Traefik?** No separate CRD needed — Traefik is a supported
+controller for a standard `Ingress`, via annotations instead of its own
+`IngressRoute`:
+
+```yaml
+ingress:
+  enabled: true
+  className: traefik
+  annotations:
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.tls.certresolver: cloudflare   # whatever resolver you already have
+    # traefik.ingress.kubernetes.io/router.middlewares: traefik-internal@kubernetescrd
+  hosts:
+    - host: domestique.example.com
+      paths: [{path: /, pathType: Prefix}]
+  tls:
+    - secretName: domestique-tls
+      hosts: [domestique.example.com]
+```
+
+Any other controller works the same way, with its own annotations in
+`ingress.annotations` — cert-manager's `cert-manager.io/cluster-issuer`,
+for instance. `ci/full-values.yaml` has the Traefik example above rendered
+in full, and CI renders it on every change.
+
 ## PostgreSQL, and no volume
 
 Routes, sync state, linked head units and Komoot sign-ins are all rows in one
@@ -172,6 +217,41 @@ for instance. Keys the app reads:
 `DOMESTIQUE_SOURCE_DSN` and `DOMESTIQUE_ENCRYPTION_KEY` are set by the chart
 from the Secrets named above; they do not go in `envFrom`.
 
+## Backups
+
+**Off by default.** Domestique has never taken its own backups, on purpose —
+this is a second, opt-in system, not something the app relies on existing.
+`backup.enabled: true` adds a `CronJob` running `pg_dump` against the same
+database `postgresql`/`envFrom` above already point at, on `backup.schedule`
+(default `0 3 * * *`).
+
+Pick exactly one destination — the chart refuses to render with neither, or
+both:
+
+```yaml
+backup:
+  enabled: true
+  destination:
+    pvc:
+      claimName: domestique-backups   # a PVC to dump into
+```
+
+or
+
+```yaml
+backup:
+  enabled: true
+  destination:
+    # A Secret with exactly these four keys: endpoint, bucket, accessKeyId,
+    # secretAccessKey. Any S3-compatible store, not AWS specifically.
+    existingSecret: domestique-backup-s3
+```
+
+`backup.retention` (days, default `7`) only applies to the `pvc` path —
+old dumps get pruned from the same volume on every run. The `existingSecret`
+path does not prune anything; most S3-compatible stores have their own
+bucket lifecycle rules, a better fit than a CronJob re-listing a bucket.
+
 ## Values
 
 | Key | Default | What |
@@ -189,8 +269,12 @@ from the Secrets named above; they do not go in `envFrom`.
 | `postgresql.storage.size` | `2Gi` | Only used when `enabled: true` |
 | `postgresql.storage.storageClass` | `""` | Only used when `enabled: true`; empty uses the cluster default |
 | `encryptionKey.existingSecret` | `""` | Enables Komoot sign-in from the UI |
-| `ingressRoute.enabled` | `false` | Traefik `IngressRoute` |
-| `ingress.enabled` | `false` | Plain `Ingress`, as an alternative |
+| `backup.enabled` | `false` | Scheduled `pg_dump`. Needs exactly one of the two destinations below |
+| `backup.schedule` | `0 3 * * *` | |
+| `backup.destination.pvc.claimName` | `""` | Dump into this PVC, pruning anything older than `retention` |
+| `backup.destination.existingSecret` | `""` | Dump to an S3-compatible store; Secret needs `endpoint`/`bucket`/`accessKeyId`/`secretAccessKey` |
+| `backup.retention` | `7` | Days of dumps to keep. Only applies to the `pvc` destination |
+| `ingress.enabled` | `false` | A plain `Ingress` — works with any controller, see **Exposing it** above |
 | `serviceAccount.name` | release name | Vault's Kubernetes auth binds to this |
 | `podDisruptionBudget.enabled` | `true` | `maxUnavailable: 1`, so node drains still work with one replica |
 | `automountServiceAccountToken` | `true` | Needed if the app authenticates to Vault |
