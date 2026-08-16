@@ -1,0 +1,9 @@
+# Exercises postgresql.enabled: the chart creates the CNPG Cluster itself
+# instead of requiring one to already exist. Also rendered by CI, so the
+# Cluster template stays valid.
+postgresql:
+  enabled: true
+  cluster: domestique-db
+  instances: 1
+  storage:
+    size: 5Gi

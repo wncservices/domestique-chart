@@ -135,6 +135,27 @@ connection string that already points at the read-write service. The chart
 reads it directly, so there is no copy of the password anywhere and nothing to
 change when the operator rotates it or the cluster fails over.
 
+**No CNPG cluster yet? The chart can create one for you:**
+
+```yaml
+postgresql:
+  enabled: true
+  cluster: domestique-db      # still required — names the Cluster this creates
+  instances: 1
+  storage:
+    size: 5Gi
+```
+
+This still needs the **CNPG operator itself already installed** in the
+target cluster — it creates a `Cluster` custom resource for the operator to
+reconcile, it does not install the operator. `helm lint`/`helm template`
+render this fine either way; a missing operator only surfaces as a real
+`helm install` failure, since the CRD comes from the operator, not this
+chart. `postgresql.cluster` does double duty on purpose: it is both the name
+of the `Cluster` this creates and the name the chart reads the resulting
+`<cluster>-app` Secret from, so there is exactly one field to get right, not
+two that have to agree.
+
 Any other PostgreSQL works too:
 
 ```yaml
@@ -243,6 +264,10 @@ bucket lifecycle rules, a better fit than a CronJob re-listing a bucket.
 | `postgresql.cluster` | `""` | CloudNativePG cluster in this namespace. **Required**, unless `existingSecret` |
 | `postgresql.existingSecret` | `""` | Any Secret holding a PostgreSQL URL; wins over `cluster` |
 | `postgresql.secretKey` | `uri` | Key within that Secret |
+| `postgresql.enabled` | `false` | Create the `postgresql.cluster` Cluster instead of requiring it to exist. Needs the CNPG operator already installed |
+| `postgresql.instances` | `1` | Only used when `enabled: true` |
+| `postgresql.storage.size` | `2Gi` | Only used when `enabled: true` |
+| `postgresql.storage.storageClass` | `""` | Only used when `enabled: true`; empty uses the cluster default |
 | `encryptionKey.existingSecret` | `""` | Enables Komoot sign-in from the UI |
 | `backup.enabled` | `false` | Scheduled `pg_dump`. Needs exactly one of the two destinations below |
 | `backup.schedule` | `0 3 * * *` | |
@@ -261,6 +286,6 @@ are placeholders.
 
 ## What this chart does not do
 
-- **Create the database.** Point `DOMESTIQUE_SOURCE_DSN` at one that exists.
+- **Create the database, by default.** Point `DOMESTIQUE_SOURCE_DSN` at one that exists, or opt in to `postgresql.enabled: true` if you'd rather the chart create a CNPG `Cluster` for you.
 - **Create the Secret.** That is your secret manager's job.
 - **Provide a ServiceMonitor.** The app exposes no metrics yet.
