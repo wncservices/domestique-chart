@@ -1,4 +1,4 @@
-# Split out of wncservices/Domestique's own charts/domestique/ into this repo,
+# Split out of wncservices/domestique's own charts/domestique/ into this repo,
 # so the chart releases independently of the application.
 apiVersion: v2
 name: domestique
@@ -12,9 +12,9 @@ version: 0.4.0
 # The application version, which is also the default image tag.
 appVersion: "0.1.0"
 
-home: https://github.com/wncservices/Domestique
+home: https://github.com/wncservices/domestique
 sources:
-  - https://github.com/wncservices/Domestique
+  - https://github.com/wncservices/domestique
 keywords:
   - cycling
   - gpx

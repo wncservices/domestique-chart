@@ -38,7 +38,7 @@ jobs:
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
 
       # Publishes to the Helm repository at
-      # https://wncservices.github.io/Domestique-chart — the form ArgoCD and
+      # https://wncservices.github.io/domestique-chart — the form ArgoCD and
       # `helm repo add` expect. Skips silently when the chart version has not
       # changed, so pushing a docs edit does not republish.
       - name: Release to the Helm repository
