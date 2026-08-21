@@ -1,16 +1,62 @@
+{{- if .Values.rollout.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+{{- else }}
 apiVersion: apps/v1
 kind: Deployment
+{{- end }}
 metadata:
   name: {{ include "domestique.fullname" . }}
   labels:
     {{- include "domestique.labels" . | nindent 4 }}
+  {{- if .Values.rollout.enabled }}
+  # Argo Rollouts' own notification-engine, not application config this
+  # chart otherwise renders — see rollout.blueGreen's own comment in
+  # values.yaml for why this needs a cluster with the Argo Rollouts
+  # controller and its notification config already in place.
+  annotations:
+    notifications.argoproj.io/subscribe.on-rollout-completed.github: ""
+    notifications.argoproj.io/subscribe.on-rollout-aborted.github: ""
+  {{- end }}
 spec:
   # One replica on purpose. Two would race on the state file and on the remote
-  # ids it records; see values.yaml.
+  # ids it records; see values.yaml. (Blue-green's own brief dual-pod window
+  # is a different, larger version of the same race, closed at the
+  # application level instead — see the app's own backgroundSyncLockKey.)
   replicas: {{ .Values.replicaCount }}
   revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  {{- if .Values.rollout.enabled }}
+  strategy:
+    blueGreen:
+      activeService: {{ include "domestique.fullname" . }}
+      previewService: {{ include "domestique.fullname" . }}-preview
+      # false: promotion waits for prePromotionAnalysis to actually pass,
+      # not just for the preview pod to become Ready. Ready only means the
+      # process started — it says nothing about whether this build works.
+      autoPromotionEnabled: {{ .Values.rollout.blueGreen.autoPromotionEnabled }}
+      scaleDownDelaySeconds: {{ .Values.rollout.blueGreen.scaleDownDelaySeconds }}
+      {{- with .Values.rollout.blueGreen.prePromotionAnalysis.templates }}
+      prePromotionAnalysis:
+        templates:
+          {{- toYaml . | nindent 10 }}
+        {{- with $.Values.rollout.blueGreen.prePromotionAnalysis.args }}
+        args:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+      {{- end }}
+      {{- with .Values.rollout.blueGreen.postPromotionAnalysis.templates }}
+      postPromotionAnalysis:
+        templates:
+          {{- toYaml . | nindent 10 }}
+        {{- with $.Values.rollout.blueGreen.postPromotionAnalysis.args }}
+        args:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+      {{- end }}
+  {{- else }}
   strategy:
     {{- toYaml .Values.strategy | nindent 4 }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "domestique.selectorLabels" . | nindent 6 }}
@@ -58,6 +104,14 @@ spec:
         {{- end }}
       labels:
         {{- include "domestique.selectorLabels" . | nindent 8 }}
+        {{- with .Values.image.gitSha }}
+        # The commit the running image was built from — read back by the
+        # Argo Rollouts notification templates (argo-rollouts/templates/
+        # notification-configmap.yaml, lab) as the GitHub commit-status
+        # target. Not the image tag: GitHub's statuses API takes a sha, and
+        # a release tag is not one.
+        domestique.dev/git-sha: {{ . | quote }}
+        {{- end }}
         {{- with .Values.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
