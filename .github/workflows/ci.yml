@@ -39,7 +39,7 @@ jobs:
 
       # The chart writes the app's config file, so a values change can produce
       # something the app rejects. Check with the real binary — built from
-      # wncservices/Domestique's own source, since the chart now lives in a
+      # wncservices/domestique's own source, since the chart now lives in a
       # separate repo. Checked out at main: Domestique has no versioned v*
       # release yet to pin this to (only chart releases exist so far), so
       # this validates against the latest app code rather than a specific
@@ -48,7 +48,7 @@ jobs:
       # the more precise check.
       - uses: actions/checkout@v7
         with:
-          repository: wncservices/Domestique
+          repository: wncservices/domestique
           path: domestique-app
       - uses: actions/setup-go@v7
         with:
