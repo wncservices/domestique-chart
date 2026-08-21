@@ -20,6 +20,39 @@ spec:
         # Restart the pod when the config changes, so an edit to values takes
         # effect without anyone remembering to bounce it.
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        # Restart the pod when a referenced Secret's *content* changes too —
+        # every one of these is a Secret this chart does not own or render
+        # (most commonly an ExternalSecret syncing from a vault), so there is
+        # no template output to hash the way configmap.yaml's own is above.
+        # `lookup` reads the live object instead: Helm re-evaluates this on
+        # every render, which for ArgoCD means every reconciliation, not just
+        # a values change — an out-of-band Secret update becomes a real
+        # manifest diff, which is what makes ArgoCD's own drift detection
+        # (and self-heal, where enabled) restart the pod at all.
+        #
+        # Collected rather than named individually, so a self-hoster's own
+        # envFrom/env additions get covered automatically: the database
+        # secret (whichever databaseSecret resolves to), the optional
+        # encryption-key secret, and every secretKeyRef/secretRef named
+        # anywhere in .Values.env/.Values.envFrom.
+        #
+        # `lookup` returns an empty object outside a real cluster (`helm
+        # template`, this chart's own CI) — the checksum comes out stable and
+        # harmless there, which is correct: there is no live drift to detect
+        # off-cluster anyway.
+        {{- $names := list (include "domestique.databaseSecret" .) }}
+        {{- with .Values.encryptionKey.existingSecret }}
+        {{- $names = append $names . }}
+        {{- end }}
+        {{- range .Values.env }}
+        {{- with .valueFrom }}{{ with .secretKeyRef }}{{ $names = append $names .name }}{{ end }}{{ end }}
+        {{- end }}
+        {{- range .Values.envFrom }}
+        {{- with .secretRef }}{{ $names = append $names .name }}{{ end }}
+        {{- end }}
+        {{- range $names | uniq }}
+        checksum/secret-{{ . }}: {{ (lookup "v1" "Secret" $.Release.Namespace .).data | toJson | sha256sum }}
+        {{- end }}
         {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
