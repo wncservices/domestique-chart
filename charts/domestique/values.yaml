@@ -255,6 +255,15 @@ rollout:
   blueGreen:
     # false: wait for prePromotionAnalysis to actually pass, not just for
     # the new pod to become Ready — Ready only means the process started.
+    #
+    # IMPORTANT if you change this: autoPromotionEnabled: false with no
+    # prePromotionAnalysis/postPromotionAnalysis templates configured below
+    # means literally nothing will ever promote a new version — there is no
+    # analysis to pass, and auto-promotion is off, so every deploy just
+    # sits ready-but-live-traffic-never-moves until someone runs
+    # `kubectl argo rollouts promote` by hand. That's a legitimate choice
+    # if manual-only promotion is actually what you want, but if it isn't,
+    # either set at least one template below or flip this to true.
     autoPromotionEnabled: false
     # How long the previous version stays fully running (not just
     # scaled-to-zero-pending) after promotion — the window a
