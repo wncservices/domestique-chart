@@ -1,0 +1,97 @@
+{{- if .Values.basemapUpdate.enabled -}}
+# Two separate identities, two separate scopes — narrower than one shared
+# identity would be:
+#
+#   this app's own ServiceAccount (already exists, serviceaccount.yaml,
+#     already mounted per automountServiceAccountToken: true) — may
+#     create/get/list/watch Jobs and get/list Pods and read Pod logs in the
+#     tiles namespace, so it can start a basemap update and poll its own
+#     progress. No delete: a triggered Job sets its own
+#     ttlSecondsAfterFinished, so cleanup is the Kubernetes TTL controller's
+#     job, not this app's — nothing here ever needs to delete a Job itself,
+#     so it does not hold the permission to. Nothing else either: it cannot
+#     touch a Secret, exec into anything, or read/write any other resource
+#     type there, and it has no access outside the tiles namespace at all.
+#
+#   a second, Job-only ServiceAccount, created here, mounted by nothing but
+#     the copy container the triggered Job itself runs — may get/list Pods
+#     and create pods/exec in the tiles namespace, which `kubectl cp` needs
+#     internally to place the extracted file into the running tiles pod.
+#     tiles is a single-component namespace (lab AGENTS.md's Namespaces
+#     table), so "any pod in this namespace" is in practice "the tiles
+#     pod" — there is nothing else here to exec into. This identity only
+#     ever exists for the lifetime of one Job's pod; the always-on app pod
+#     never holds pods/exec itself.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "domestique.fullname" . }}-basemap-trigger
+  namespace: {{ .Values.basemapUpdate.tilesNamespace }}
+  labels:
+    {{- include "domestique.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "domestique.fullname" . }}-basemap-trigger
+  namespace: {{ .Values.basemapUpdate.tilesNamespace }}
+  labels:
+    {{- include "domestique.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "domestique.fullname" . }}-basemap-trigger
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "domestique.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "domestique.fullname" . }}-basemap-copy
+  namespace: {{ .Values.basemapUpdate.tilesNamespace }}
+  labels:
+    {{- include "domestique.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "domestique.fullname" . }}-basemap-copy
+  namespace: {{ .Values.basemapUpdate.tilesNamespace }}
+  labels:
+    {{- include "domestique.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "domestique.fullname" . }}-basemap-copy
+  namespace: {{ .Values.basemapUpdate.tilesNamespace }}
+  labels:
+    {{- include "domestique.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "domestique.fullname" . }}-basemap-copy
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "domestique.fullname" . }}-basemap-copy
+    namespace: {{ .Values.basemapUpdate.tilesNamespace }}
+{{- end }}

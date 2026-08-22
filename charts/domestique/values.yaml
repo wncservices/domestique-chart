@@ -347,3 +347,46 @@ podLabels: {}
 nodeSelector: {}
 tolerations: []
 affinity: {}
+
+# Lets an admin trigger a basemap update for the tiles component from this
+# app's own UI (internal/basemap), instead of the pmtiles extract + kubectl
+# cp runbook in domestique-infra/tiles/templates/deployment.yaml. Off by
+# default: it needs the tiles component installed in the namespace named
+# below, and grants this app's own ServiceAccount real (if narrowly scoped
+# — see templates/basemap-rbac.yaml) Kubernetes API access it otherwise has
+# none of. The app itself builds and submits the Job at request time (the
+# bbox and zoom vary per request, so there is no static Job manifest to
+# render here) — this block is only the standing RBAC plus the images and
+# limits that Job runs with.
+basemapUpdate:
+  enabled: false
+  # The tiles component's own namespace — see lab AGENTS.md's Namespaces
+  # table; one namespace per component is the convention this assumes.
+  tilesNamespace: tiles
+  # Must match tiles/templates/deployment.yaml's own pod labels in
+  # domestique-infra — how the copy step's `kubectl cp`/`exec` finds the
+  # live tiles pod to write into.
+  tilesPodSelector: "app.kubernetes.io/name=tiles"
+  # Always the latest tag, checked against the registry, same discipline
+  # lab/AGENTS.md already applies to Helm chart dependencies.
+  extractImage:
+    repository: protomaps/go-pmtiles
+    tag: v1.31.2
+  # alpine/k8s, not a bare kubectl image: bash + kubectl + jq in one place,
+  # the same image domestique-infra's own garmin-consumer CronJob already
+  # uses for exactly this "small script needs kubectl" shape.
+  copyImage:
+    repository: alpine/k8s
+    tag: "1.36.2"
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+  # Scratch space for the initContainer's download — not the tiles PVC
+  # itself. Sized for a Western Europe extract at maxzoom 14 (~9GB
+  # observed) plus headroom; a wider region or deeper zoom needs this
+  # raised too.
+  workVolumeSize: 15Gi
+  activeDeadlineSeconds: 1800

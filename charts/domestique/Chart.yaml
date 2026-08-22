@@ -8,10 +8,14 @@ type: application
 # The chart version. Bumped on every chart change; chart-releaser publishes a
 # release per version, so this must go up or the release is skipped.
 #
+# 0.7.0: optional basemapUpdate.enabled renders RBAC letting this app's own
+# ServiceAccount trigger a basemap update Job in the tiles namespace.
+# Backward compatible — the default (false) renders nothing new.
+#
 # 0.6.0: optional rollout.enabled renders a Rollout (Argo Rollouts CRD)
 # instead of the plain Deployment, for a test-gated blue-green promotion.
 # Backward compatible — the default (false) renders exactly what 0.5.0 did.
-version: 0.6.0
+version: 0.7.0
 
 # The application version, which is also the default image tag.
 appVersion: "0.1.0"
