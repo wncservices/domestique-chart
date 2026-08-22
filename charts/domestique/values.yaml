@@ -363,30 +363,34 @@ basemapUpdate:
   # The tiles component's own namespace — see lab AGENTS.md's Namespaces
   # table; one namespace per component is the convention this assumes.
   tilesNamespace: tiles
-  # Must match tiles/templates/deployment.yaml's own pod labels in
-  # domestique-infra — how the copy step's `kubectl cp`/`exec` finds the
-  # live tiles pod to write into.
-  tilesPodSelector: "app.kubernetes.io/name=tiles"
+  # The tiles Deployment's own basemap PVC — mounted directly by the Job
+  # (both the extract step and the final atomic rename onto the
+  # live-serving filename happen on this same volume) rather than
+  # streamed in via kubectl cp/exec, which proved unreliable for a file
+  # this size (tar stream corruption in practice, connection resets in
+  # earlier manual attempts at the same transfer). Needs nfs-client
+  # (ReadWriteMany) specifically, not iscsi-client, so the Job and the
+  # tiles pod can hold it at once — see domestique-infra/tiles' own PVC.
+  # No sensible chart-wide default: this names an object domestique-chart
+  # doesn't render (tiles is a separate Helm release), so it has to be
+  # set explicitly to whatever that release actually calls it.
+  tilesPVCName: ""
   # Always the latest tag, checked against the registry, same discipline
   # lab/AGENTS.md already applies to Helm chart dependencies.
   extractImage:
     repository: protomaps/go-pmtiles
     tag: v1.31.2
-  # alpine/k8s, not a bare kubectl image: bash + kubectl + jq in one place,
-  # the same image domestique-infra's own garmin-consumer CronJob already
-  # uses for exactly this "small script needs kubectl" shape.
+  # A plain alpine, not alpine/k8s: the copy container only ever runs mv
+  # and wc on the mounted PVC now — it has not called the Kubernetes API
+  # (and so has not needed kubectl) since tilesPVCName above replaced the
+  # kubectl cp/exec transfer.
   copyImage:
-    repository: alpine/k8s
-    tag: "1.36.2"
+    repository: alpine
+    tag: "3.22.2"
   resources:
     requests:
       cpu: 250m
       memory: 256Mi
     limits:
       memory: 1Gi
-  # Scratch space for the initContainer's download — not the tiles PVC
-  # itself. Sized for a Western Europe extract at maxzoom 14 (~9GB
-  # observed) plus headroom; a wider region or deeper zoom needs this
-  # raised too.
-  workVolumeSize: 15Gi
   activeDeadlineSeconds: 1800
