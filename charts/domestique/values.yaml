@@ -5,6 +5,12 @@ image:
   # Defaults to the chart's appVersion.
   tag: ""
   pullPolicy: IfNotPresent
+  # The full commit SHA the image at `tag` was built from. Only meaningful
+  # with rollout.enabled below — becomes a pod-template label
+  # (domestique.dev/git-sha) the Argo Rollouts notification config reads
+  # back as its GitHub commit-status target. Empty is fine otherwise; there
+  # is nothing to report a status against without Rollouts in the picture.
+  gitSha: ""
 
 imagePullSecrets: []
 nameOverride: ""
@@ -231,6 +237,56 @@ strategy:
   rollingUpdate:
     maxUnavailable: 0
     maxSurge: 1
+
+# Opt-in: renders a Rollout (Argo Rollouts CRD) instead of the plain
+# Deployment above, so real traffic only ever moves to a new version once
+# it has actually been checked, not just once its pod is Ready.
+#
+# Off by default deliberately — this needs the Argo Rollouts controller
+# already installed in the target cluster (this chart does not install it,
+# same relationship it already has with CNPG below), and self-hosters
+# without it should get the plain Deployment they already had, not a
+# resource kind their cluster cannot schedule at all.
+#
+# `strategy:` above still governs the plain-Deployment path; it is unused
+# whenever this is enabled.
+rollout:
+  enabled: false
+  blueGreen:
+    # false: wait for prePromotionAnalysis to actually pass, not just for
+    # the new pod to become Ready — Ready only means the process started.
+    #
+    # IMPORTANT if you change this: autoPromotionEnabled: false with no
+    # prePromotionAnalysis/postPromotionAnalysis templates configured below
+    # means literally nothing will ever promote a new version — there is no
+    # analysis to pass, and auto-promotion is off, so every deploy just
+    # sits ready-but-live-traffic-never-moves until someone runs
+    # `kubectl argo rollouts promote` by hand. That's a legitimate choice
+    # if manual-only promotion is actually what you want, but if it isn't,
+    # either set at least one template below or flip this to true.
+    autoPromotionEnabled: false
+    # How long the previous version stays fully running (not just
+    # scaled-to-zero-pending) after promotion — the window a
+    # postPromotionAnalysis failure can still automatically roll back
+    # into. Comfortably longer than a real end-to-end login check needs,
+    # short enough that "two live pods" (see the app's own
+    # backgroundSyncLockKey, which is what actually makes that safe rather
+    # than merely brief) doesn't linger forever.
+    scaleDownDelaySeconds: 300
+    # Each entry is {templateName: <AnalysisTemplate/ClusterAnalysisTemplate
+    # name>}, exactly the Rollout API's own shape — this chart does not
+    # define what the templates actually check, only whether/which ones
+    # run. A deployment wiring this up (domestique-infra, not this chart)
+    # owns writing the AnalysisTemplate resources themselves and listing
+    # their names here.
+    prePromotionAnalysis:
+      templates: []
+      # - templateName: domestique-pre-promotion
+      args: []
+    postPromotionAnalysis:
+      templates: []
+      # - templateName: domestique-post-promotion
+      args: []
 
 revisionHistoryLimit: 3
 

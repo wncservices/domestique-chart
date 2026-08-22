@@ -1,0 +1,18 @@
+# Exercises the Rollout path — CI only renders (no cluster, no Argo Rollouts
+# CRDs needed for that), so this is template validation, not a real
+# promotion. See rollout: in values.yaml for what each field means.
+postgresql:
+  cluster: domestique-db
+
+image:
+  gitSha: "0123456789abcdef0123456789abcdef01234567"
+
+rollout:
+  enabled: true
+  blueGreen:
+    prePromotionAnalysis:
+      templates:
+        - templateName: domestique-pre-promotion
+    postPromotionAnalysis:
+      templates:
+        - templateName: domestique-post-promotion

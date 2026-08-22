@@ -13,3 +13,26 @@ spec:
       protocol: TCP
   selector:
     {{- include "domestique.selectorLabels" . | nindent 4 }}
+{{- if .Values.rollout.enabled }}
+---
+# Argo Rollouts' own previewService — never referenced by this chart's own
+# ingress.yaml, and deliberately not: it exists so a prePromotionAnalysis
+# Job can reach the not-yet-promoted version directly and in isolation,
+# not so real traffic ever lands here. The Rollout controller repoints
+# which ReplicaSet this selects; nothing in this chart does that.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "domestique.fullname" . }}-preview
+  labels:
+    {{- include "domestique.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - name: http
+      port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP
+  selector:
+    {{- include "domestique.selectorLabels" . | nindent 4 }}
+{{- end }}
