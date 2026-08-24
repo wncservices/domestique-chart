@@ -26,6 +26,18 @@ spec:
   replicas: {{ .Values.replicaCount }}
   revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
   {{- if .Values.rollout.enabled }}
+  {{- if or (ne .Values.rollout.analysis.successfulRunHistoryLimit nil) (ne .Values.rollout.analysis.unsuccessfulRunHistoryLimit nil) }}
+  # Sibling of strategy.blueGreen below, not nested in it — this is a
+  # Rollout-wide AnalysisRun retention setting, not specific to blue-green.
+  # See rollout.analysis's own comment in values.yaml.
+  analysis:
+    {{- if ne .Values.rollout.analysis.successfulRunHistoryLimit nil }}
+    successfulRunHistoryLimit: {{ .Values.rollout.analysis.successfulRunHistoryLimit }}
+    {{- end }}
+    {{- if ne .Values.rollout.analysis.unsuccessfulRunHistoryLimit nil }}
+    unsuccessfulRunHistoryLimit: {{ .Values.rollout.analysis.unsuccessfulRunHistoryLimit }}
+    {{- end }}
+  {{- end }}
   strategy:
     blueGreen:
       activeService: {{ include "domestique.fullname" . }}
