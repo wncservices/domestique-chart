@@ -3,6 +3,29 @@ entries:
   domestique:
   - apiVersion: v2
     appVersion: 0.1.0
+    created: "2026-08-24T18:59:19.850867998Z"
+    description: Shared cycling route library that syncs to Garmin and Wahoo head
+      units
+    digest: d6f49a42638a0a0b85f7e468d4a3fdf39410f25535f68e0422ca990906bb3167
+    home: https://github.com/wncservices/domestique
+    keywords:
+    - cycling
+    - gpx
+    - garmin
+    - wahoo
+    - komoot
+    maintainers:
+    - name: wncservices
+      url: https://github.com/wncservices
+    name: domestique
+    sources:
+    - https://github.com/wncservices/domestique
+    type: application
+    urls:
+    - https://github.com/wncservices/domestique-chart/releases/download/domestique-0.10.0/domestique-0.10.0.tgz
+    version: 0.10.0
+  - apiVersion: v2
+    appVersion: 0.1.0
     created: "2026-08-24T17:16:01.376342566Z"
     description: Shared cycling route library that syncs to Garmin and Wahoo head
       units
@@ -162,4 +185,4 @@ entries:
     urls:
     - https://github.com/wncservices/domestique-chart/releases/download/domestique-0.3.0/domestique-0.3.0.tgz
     version: 0.3.0
-generated: "2026-08-24T17:16:01.37637183Z"
+generated: "2026-08-24T18:59:19.850884308Z"
