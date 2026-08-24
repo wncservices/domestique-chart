@@ -252,6 +252,19 @@ strategy:
 # whenever this is enabled.
 rollout:
   enabled: false
+  # How many old AnalysisRuns the Rollout controller keeps around after
+  # they're superseded by a newer revision — this is retention, not a
+  # switch: the controller prunes on this schedule regardless, there is no
+  # way to keep everything forever. null leaves each limit at the
+  # controller's own default (5 successful, 5 unsuccessful,
+  # utils/defaults/defaults.go upstream) — set either to 0 for "don't keep
+  # any old ones once superseded," which is what "clean up after a run"
+  # means in a repo where every promotion's own pass/fail already lives in
+  # this Rollout's `status` and, for postPromotionAnalysis specifically, in
+  # its own e2e Job logs (kept by K8s' own TTL, not this).
+  analysis:
+    successfulRunHistoryLimit: null
+    unsuccessfulRunHistoryLimit: null
   blueGreen:
     # false: wait for prePromotionAnalysis to actually pass, not just for
     # the new pod to become Ready — Ready only means the process started.
