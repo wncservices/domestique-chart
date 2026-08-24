@@ -322,8 +322,14 @@ resources:
   requests:
     cpu: 10m
     memory: 64Mi
+  # 256Mi was too tight: a library page loading several route cards at once
+  # fires that many concurrent track-preview computations (each decoding
+  # thousands of polygon rings into memory), and that burst OOMKilled the
+  # pod. wncservices/domestique's own FetchLayers now caps that concurrency,
+  # but this limit still needs enough headroom above the app's steady-state
+  # usage to absorb the burst rather than relying solely on the app-side cap.
   limits:
-    memory: 256Mi
+    memory: 1Gi
 
 # The image runs as uid 10001 and writes only to the mounted volume.
 podSecurityContext:
