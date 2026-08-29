@@ -8,6 +8,13 @@ type: application
 # The chart version. Bumped on every chart change; chart-releaser publishes a
 # release per version, so this must go up or the release is skipped.
 #
+# 0.10.2: appVersion 1.3.0 -> 1.6.0 — catches the chart's default image tag
+# up to wncservices/domestique's latest release, which added recurring crew
+# rides, route sharing outside a crew (with recipient-side import into their
+# own library), and a migration hotfix for existing crew_rides deployments.
+# No template/values change. Backward compatible — image.tag stays
+# override-able as always.
+#
 # 0.10.1: appVersion 0.1.0 -> 1.3.0 — the first time this chart has tracked
 # a real application release rather than the placeholder it shipped with.
 # wncservices/domestique started cutting real v* releases a few versions
@@ -44,10 +51,10 @@ type: application
 # 0.6.0: optional rollout.enabled renders a Rollout (Argo Rollouts CRD)
 # instead of the plain Deployment, for a test-gated blue-green promotion.
 # Backward compatible — the default (false) renders exactly what 0.5.0 did.
-version: 0.10.1
+version: 0.10.2
 
 # The application version, which is also the default image tag.
-appVersion: "1.3.0"
+appVersion: "1.6.0"
 
 home: https://github.com/wncservices/domestique
 sources:
