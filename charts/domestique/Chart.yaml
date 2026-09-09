@@ -8,6 +8,18 @@ type: application
 # The chart version. Bumped on every chart change; chart-releaser publishes a
 # release per version, so this must go up or the release is skipped.
 #
+# 0.10.3: appVersion 1.6.0 -> 1.9.4 — catches the chart's default image tag
+# up to wncservices/domestique's latest release, which added an interactive
+# route builder (draw waypoints or generate a round-trip loop, backed by a
+# self-hosted OpenRouteService instance, off by default) plus a run of UI
+# fixes on top of it — the elevation chart's own rendering, the Draw tab's
+# toolbar on a phone-width viewport, and removing a waypoint or a named
+# marker by clicking it again. No template/values change: a routing-engine
+# endpoint is just another env var, already covered by the generic
+# envFrom/env passthrough (see deployment.yaml's own comment) rather than
+# anything this chart itemizes. Backward compatible — image.tag stays
+# override-able as always.
+#
 # 0.10.2: appVersion 1.3.0 -> 1.6.0 — catches the chart's default image tag
 # up to wncservices/domestique's latest release, which added recurring crew
 # rides, route sharing outside a crew (with recipient-side import into their
@@ -51,10 +63,10 @@ type: application
 # 0.6.0: optional rollout.enabled renders a Rollout (Argo Rollouts CRD)
 # instead of the plain Deployment, for a test-gated blue-green promotion.
 # Backward compatible — the default (false) renders exactly what 0.5.0 did.
-version: 0.10.2
+version: 0.10.3
 
 # The application version, which is also the default image tag.
-appVersion: "1.6.0"
+appVersion: "1.9.4"
 
 home: https://github.com/wncservices/domestique
 sources:
