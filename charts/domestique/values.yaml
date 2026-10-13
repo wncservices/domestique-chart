@@ -201,7 +201,7 @@ basemapUpdate:
     tag: v1.31.2
   copyImage:
     repository: alpine
-    tag: "3.22.2"
+    tag: "3.24.2"
   resources:
     requests:
       cpu: 250m
