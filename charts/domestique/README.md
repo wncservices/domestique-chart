@@ -288,4 +288,4 @@ are placeholders.
 
 - **Create the database, by default.** Point `DOMESTIQUE_SOURCE_DSN` at one that exists, or opt in to `postgresql.enabled: true` if you'd rather the chart create a CNPG `Cluster` for you.
 - **Create the Secret.** That is your secret manager's job.
-- **Provide a ServiceMonitor.** The app exposes no metrics yet.
+- **Scrape metrics unless you ask it to.** The pod serves Prometheus metrics on the `metrics` port (`metrics.port`, 9090), in-cluster only. Set `metrics.serviceMonitor.enabled: true` to render a ServiceMonitor (needs the Prometheus Operator CRDs; add `metrics.serviceMonitor.labels` if your Prometheus selects on them). Never route the metrics port through an ingress.

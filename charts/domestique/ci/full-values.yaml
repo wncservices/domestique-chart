@@ -60,3 +60,10 @@ ingress:
     - secretName: domestique-tls
       hosts:
         - domestique.example.com
+
+# Render the ServiceMonitor too, so CI keeps it valid.
+metrics:
+  serviceMonitor:
+    enabled: true
+    labels:
+      release: kube-prometheus-stack

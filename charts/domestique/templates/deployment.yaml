@@ -155,11 +155,19 @@ spec:
             - name: http
               containerPort: 8080
               protocol: TCP
+            {{- if .Values.metrics.enabled }}
+            - name: metrics
+              containerPort: {{ .Values.metrics.port }}
+              protocol: TCP
+            {{- end }}
           {{- with .Values.envFrom }}
           envFrom:
             {{- toYaml . | nindent 12 }}
           {{- end }}
           env:
+            # Where the app serves /metrics; empty turns the listener off.
+            - name: DOMESTIQUE_METRICS_ADDR
+              value: {{ if .Values.metrics.enabled }}{{ printf ":%v" .Values.metrics.port | quote }}{{ else }}""{{ end }}
             # The DSN is the one thing this chart insists on. Sourced from a
             # Secret rather than the ConfigMap because it carries a password.
             - name: DOMESTIQUE_SOURCE_DSN

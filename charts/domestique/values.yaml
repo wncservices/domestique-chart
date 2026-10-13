@@ -183,6 +183,25 @@ service:
   type: ClusterIP
   port: 80
 
+# Prometheus metrics, pull-based, on a port of their own. The app serves
+# /metrics on DOMESTIQUE_METRICS_ADDR, which this chart sets to :<port>. The
+# Service gains a `metrics` port, but the ingress only ever routes to
+# service.port, so metrics are reachable in-cluster and never from outside.
+# Do not add this port to an ingress, an IngressRoute or a LoadBalancer.
+metrics:
+  enabled: true
+  port: 9090
+  # A Prometheus Operator ServiceMonitor scraping the metrics port. Off by
+  # default: it needs the monitoring.coreos.com CRDs, which a generic chart
+  # cannot assume a cluster has.
+  serviceMonitor:
+    enabled: false
+    interval: 30s
+    scrapeTimeout: 10s
+    # Extra labels, for a Prometheus whose serviceMonitorSelector matches on
+    # them (kube-prometheus-stack's `release: <name>`, for instance).
+    labels: {}
+
 # A plain networking.k8s.io/v1 Ingress — deliberately the only ingress
 # resource this chart offers, so it works with whatever controller a
 # cluster already has rather than assuming one. Empty className/annotations
