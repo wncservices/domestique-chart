@@ -1,6 +1,3 @@
-# Exercises the Rollout path — CI only renders (no cluster, no Argo Rollouts
-# CRDs needed for that), so this is template validation, not a real
-# promotion. See rollout: in values.yaml for what each field means.
 postgresql:
   cluster: domestique-db
 

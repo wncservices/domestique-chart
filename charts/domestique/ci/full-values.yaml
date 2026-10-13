@@ -1,17 +1,10 @@
-# A complete deployment: PostgreSQL, a reverse proxy doing authentication,
-# Traefik ingress, credentials from a Secret. Everything here is a placeholder
-# — substitute your own hosts, groups and accounts.
-#
-# Also rendered by CI, so it stays valid.
 config:
-  # No source.dsn: DOMESTIQUE_SOURCE_DSN comes from the Secret below, so the
-  # password never lands in a ConfigMap.
   source: {}
 
   auth:
     mode: proxy
     trusted_proxies:
-      - 10.0.0.0/8            # your pod CIDR
+      - 10.0.0.0/8
     roles:
       admin:
         - route-admins
@@ -24,26 +17,16 @@ config:
   komoot:
     enabled: true
 
-  # No accounts here: riders link their own head units from the UI.
-
-# Create this Secret yourself — an ExternalSecret from a secret manager, for
-# instance. It must carry DOMESTIQUE_SOURCE_DSN, and KOMOOT_EMAIL /
-# KOMOOT_PASSWORD when Komoot import is on.
 envFrom:
   - secretRef:
       name: domestique
 
-# With PostgreSQL there is nothing left to keep on disk.
 postgresql:
-  # The operator publishes domestique-db-app; the chart reads it.
   cluster: domestique-db
 
 encryptionKey:
   existingSecret: domestique
 
-# A generic Ingress, with Traefik-specific annotations to get TLS and a
-# middleware — the same resource any other ingress controller would use,
-# just with that controller's own annotations instead of these two.
 ingress:
   enabled: true
   className: traefik
@@ -61,7 +44,6 @@ ingress:
       hosts:
         - domestique.example.com
 
-# Render the ServiceMonitor too, so CI keeps it valid.
 metrics:
   serviceMonitor:
     enabled: true

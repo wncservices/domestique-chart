@@ -6,11 +6,6 @@ metadata:
   labels:
     {{- include "domestique.labels" . | nindent 4 }}
 spec:
-  # maxUnavailable rather than minAvailable, deliberately. This runs one
-  # replica, and `minAvailable: 1` on a single-replica Deployment blocks node
-  # drains forever — the node can never evict the only pod. maxUnavailable
-  # still protects against a careless simultaneous eviction while letting a
-  # drain proceed.
   {{- if .Values.podDisruptionBudget.minAvailable }}
   minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
   {{- else }}

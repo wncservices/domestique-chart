@@ -1,6 +1,4 @@
 {{- if and .Values.metrics.enabled .Values.metrics.serviceMonitor.enabled }}
-# Scrapes the metrics port on the main Service only: the Argo Rollouts preview
-# Service carries no metrics port, so it yields no targets.
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
