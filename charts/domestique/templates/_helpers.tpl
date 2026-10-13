@@ -41,18 +41,6 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 {{- end -}}
 
-{{/*
-Which Secret holds the PostgreSQL URL.
-
-CloudNativePG publishes <cluster>-app when it creates a cluster: a Secret with
-a ready-made connection string that already points at the read-write service
-and follows a failover. Reading it directly means there is no copy of the
-password anywhere, and nothing to update when the operator rotates it.
-
-Failing here rather than defaulting to SQLite is deliberate. A chart that
-quietly fell back would hand you a working pod holding the only copy of your
-library on a disk nothing backs up, and you would find out later.
-*/}}
 {{- define "domestique.databaseSecret" -}}
 {{- if .Values.postgresql.existingSecret -}}
 {{- .Values.postgresql.existingSecret -}}
@@ -67,7 +55,6 @@ library on a disk nothing backs up, and you would find out later.
 {{- if .Values.postgresql.existingSecret -}}
 {{- .Values.postgresql.secretKey -}}
 {{- else -}}
-{{- /* CloudNativePG names it `uri`. */ -}}
 uri
 {{- end -}}
 {{- end -}}

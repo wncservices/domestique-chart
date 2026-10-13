@@ -1,5 +1,3 @@
-# Exercises backup.enabled with the PVC destination — the simpler of the
-# two, one container, no second image. Also rendered by CI.
 postgresql:
   cluster: domestique-db
 

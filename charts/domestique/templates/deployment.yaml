@@ -10,26 +10,15 @@ metadata:
   labels:
     {{- include "domestique.labels" . | nindent 4 }}
   {{- if .Values.rollout.enabled }}
-  # Argo Rollouts' own notification-engine, not application config this
-  # chart otherwise renders — see rollout.blueGreen's own comment in
-  # values.yaml for why this needs a cluster with the Argo Rollouts
-  # controller and its notification config already in place.
   annotations:
     notifications.argoproj.io/subscribe.on-rollout-completed.github: ""
     notifications.argoproj.io/subscribe.on-rollout-aborted.github: ""
   {{- end }}
 spec:
-  # One replica on purpose. Two would race on the state file and on the remote
-  # ids it records; see values.yaml. (Blue-green's own brief dual-pod window
-  # is a different, larger version of the same race, closed at the
-  # application level instead — see the app's own backgroundSyncLockKey.)
   replicas: {{ .Values.replicaCount }}
   revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
   {{- if .Values.rollout.enabled }}
   {{- if or (ne .Values.rollout.analysis.successfulRunHistoryLimit nil) (ne .Values.rollout.analysis.unsuccessfulRunHistoryLimit nil) }}
-  # Sibling of strategy.blueGreen below, not nested in it — this is a
-  # Rollout-wide AnalysisRun retention setting, not specific to blue-green.
-  # See rollout.analysis's own comment in values.yaml.
   analysis:
     {{- if ne .Values.rollout.analysis.successfulRunHistoryLimit nil }}
     successfulRunHistoryLimit: {{ .Values.rollout.analysis.successfulRunHistoryLimit }}
@@ -42,9 +31,6 @@ spec:
     blueGreen:
       activeService: {{ include "domestique.fullname" . }}
       previewService: {{ include "domestique.fullname" . }}-preview
-      # false: promotion waits for prePromotionAnalysis to actually pass,
-      # not just for the preview pod to become Ready. Ready only means the
-      # process started — it says nothing about whether this build works.
       autoPromotionEnabled: {{ .Values.rollout.blueGreen.autoPromotionEnabled }}
       scaleDownDelaySeconds: {{ .Values.rollout.blueGreen.scaleDownDelaySeconds }}
       {{- with .Values.rollout.blueGreen.prePromotionAnalysis.templates }}
@@ -75,29 +61,7 @@ spec:
   template:
     metadata:
       annotations:
-        # Restart the pod when the config changes, so an edit to values takes
-        # effect without anyone remembering to bounce it.
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
-        # Restart the pod when a referenced Secret's *content* changes too —
-        # every one of these is a Secret this chart does not own or render
-        # (most commonly an ExternalSecret syncing from a vault), so there is
-        # no template output to hash the way configmap.yaml's own is above.
-        # `lookup` reads the live object instead: Helm re-evaluates this on
-        # every render, which for ArgoCD means every reconciliation, not just
-        # a values change — an out-of-band Secret update becomes a real
-        # manifest diff, which is what makes ArgoCD's own drift detection
-        # (and self-heal, where enabled) restart the pod at all.
-        #
-        # Collected rather than named individually, so a self-hoster's own
-        # envFrom/env additions get covered automatically: the database
-        # secret (whichever databaseSecret resolves to), the optional
-        # encryption-key secret, and every secretKeyRef/secretRef named
-        # anywhere in .Values.env/.Values.envFrom.
-        #
-        # `lookup` returns an empty object outside a real cluster (`helm
-        # template`, this chart's own CI) — the checksum comes out stable and
-        # harmless there, which is correct: there is no live drift to detect
-        # off-cluster anyway.
         {{- $names := list (include "domestique.databaseSecret" .) }}
         {{- with .Values.encryptionKey.existingSecret }}
         {{- $names = append $names . }}
@@ -117,11 +81,6 @@ spec:
       labels:
         {{- include "domestique.selectorLabels" . | nindent 8 }}
         {{- with .Values.image.gitSha }}
-        # The commit the running image was built from — read back by the
-        # Argo Rollouts notification templates (argo-rollouts/templates/
-        # notification-configmap.yaml, lab) as the GitHub commit-status
-        # target. Not the image tag: GitHub's statuses API takes a sha, and
-        # a release tag is not one.
         domestique.dev/git-sha: {{ . | quote }}
         {{- end }}
         {{- with .Values.podLabels }}
@@ -155,13 +114,18 @@ spec:
             - name: http
               containerPort: 8080
               protocol: TCP
+            {{- if .Values.metrics.enabled }}
+            - name: metrics
+              containerPort: {{ .Values.metrics.port }}
+              protocol: TCP
+            {{- end }}
           {{- with .Values.envFrom }}
           envFrom:
             {{- toYaml . | nindent 12 }}
           {{- end }}
           env:
-            # The DSN is the one thing this chart insists on. Sourced from a
-            # Secret rather than the ConfigMap because it carries a password.
+            - name: DOMESTIQUE_METRICS_ADDR
+              value: {{ if .Values.metrics.enabled }}{{ printf ":%v" .Values.metrics.port | quote }}{{ else }}""{{ end }}
             - name: DOMESTIQUE_SOURCE_DSN
               valueFrom:
                 secretKeyRef:
@@ -188,8 +152,6 @@ spec:
               mountPath: /app/domestique.yaml
               subPath: domestique.yaml
               readOnly: true
-            # The root filesystem is read-only, so give the process a writable
-            # temp directory rather than making the whole thing writable.
             - name: tmp
               mountPath: /tmp
       volumes:

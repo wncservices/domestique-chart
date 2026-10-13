@@ -24,10 +24,6 @@ spec:
         spec:
           restartPolicy: OnFailure
           {{- if $s3 }}
-          # pg_dump and an S3 client do not both live in one image: dump to
-          # a shared emptyDir first, upload it second. initContainers run to
-          # completion before the main container starts, which is exactly
-          # the ordering this needs.
           initContainers:
             - name: dump
               image: "{{ .Values.backup.image.repository }}:{{ .Values.backup.image.tag }}"
@@ -49,9 +45,6 @@ spec:
           containers:
             - name: upload
               image: minio/mc:latest
-              # Secret must carry exactly these four keys — envFrom names
-              # the env vars after them, and the script below reads them by
-              # those same names.
               envFrom:
                 - secretRef:
                     name: {{ $s3 }}

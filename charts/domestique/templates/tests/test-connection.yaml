@@ -12,8 +12,6 @@ spec:
   securityContext:
     {{- toYaml .Values.podSecurityContext | nindent 4 }}
   containers:
-    # Reuses the app image rather than pulling curl: one less thing to keep
-    # current, and it proves the image itself runs.
     - name: health
       image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
       imagePullPolicy: {{ .Values.image.pullPolicy }}

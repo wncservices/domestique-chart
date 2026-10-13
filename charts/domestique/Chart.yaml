@@ -1,10 +1,9 @@
-# Split out of wncservices/domestique's own charts/domestique/ into this repo,
-# so the chart releases independently of the application.
 apiVersion: v2
 name: domestique
 description: Shared cycling route library that syncs to Garmin and Wahoo head units
 type: application
-# The application version, which is also the default image tag.
+
+version: 0.11.0
 appVersion: "2.0.0"
 
 home: https://github.com/wncservices/domestique
