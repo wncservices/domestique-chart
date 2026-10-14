@@ -4,7 +4,7 @@ description: Shared cycling route library that syncs to Garmin and Wahoo head un
 type: application
 
 version: 0.11.2
-appVersion: "2.7.0"
+appVersion: "2.7.1"
 
 home: https://github.com/wncservices/domestique
 sources:
