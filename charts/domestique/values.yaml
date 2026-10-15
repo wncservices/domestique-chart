@@ -3,8 +3,8 @@ image:
   # Defaults to the chart's appVersion.
   tag: ""
   pullPolicy: IfNotPresent
-  # Commit the image was built from; only used with rollout.enabled.
-  gitSha: ""
+  # Commit appVersion was built from (bump it with appVersion); only used with rollout.enabled.
+  gitSha: "7b0bf9a93870b945952ab99a4fb270f5b9731615"
 
 imagePullSecrets: []
 nameOverride: ""
