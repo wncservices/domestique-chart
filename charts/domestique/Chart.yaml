@@ -3,7 +3,7 @@ name: domestique
 description: Shared cycling route library that syncs to Garmin and Wahoo head units
 type: application
 
-version: 0.11.7
+version: 0.11.8
 appVersion: "2.12.1"
 
 home: https://github.com/wncservices/domestique
