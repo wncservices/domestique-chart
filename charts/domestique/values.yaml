@@ -69,7 +69,7 @@ backup:
   schedule: "0 3 * * *"
   image:
     repository: postgres
-    tag: 16-alpine
+    tag: 18-alpine
   destination:
     pvc:
       claimName: ""
