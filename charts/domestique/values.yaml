@@ -3,7 +3,7 @@ image:
   # Defaults to the chart's appVersion.
   tag: ""
   pullPolicy: IfNotPresent
-  # Commit the image was built from; only used with rollout.enabled.
+  # Commit the image was built from; set as the pod label domestique.dev/git-sha.
   gitSha: ""
 
 imagePullSecrets: []
@@ -116,25 +116,6 @@ strategy:
   rollingUpdate:
     maxUnavailable: 0
     maxSurge: 1
-
-# Argo Rollouts blue-green instead of a Deployment (needs the controller).
-rollout:
-  enabled: false
-  analysis:
-    successfulRunHistoryLimit: null
-    unsuccessfulRunHistoryLimit: null
-  blueGreen:
-    # With no analysis templates, false means nothing ever promotes automatically.
-    autoPromotionEnabled: false
-    scaleDownDelaySeconds: 300
-    prePromotionAnalysis:
-      templates: []
-      # - templateName: domestique-pre-promotion
-      args: []
-    postPromotionAnalysis:
-      templates: []
-      # - templateName: domestique-post-promotion
-      args: []
 
 revisionHistoryLimit: 3
 

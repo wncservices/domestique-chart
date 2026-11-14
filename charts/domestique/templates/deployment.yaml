@@ -1,60 +1,14 @@
-{{- if .Values.rollout.enabled }}
-apiVersion: argoproj.io/v1alpha1
-kind: Rollout
-{{- else }}
 apiVersion: apps/v1
 kind: Deployment
-{{- end }}
 metadata:
   name: {{ include "domestique.fullname" . }}
   labels:
     {{- include "domestique.labels" . | nindent 4 }}
-  {{- if .Values.rollout.enabled }}
-  annotations:
-    notifications.argoproj.io/subscribe.on-rollout-completed.github: ""
-    notifications.argoproj.io/subscribe.on-rollout-aborted.github: ""
-  {{- end }}
 spec:
   replicas: {{ .Values.replicaCount }}
   revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
-  {{- if .Values.rollout.enabled }}
-  {{- if or (ne .Values.rollout.analysis.successfulRunHistoryLimit nil) (ne .Values.rollout.analysis.unsuccessfulRunHistoryLimit nil) }}
-  analysis:
-    {{- if ne .Values.rollout.analysis.successfulRunHistoryLimit nil }}
-    successfulRunHistoryLimit: {{ .Values.rollout.analysis.successfulRunHistoryLimit }}
-    {{- end }}
-    {{- if ne .Values.rollout.analysis.unsuccessfulRunHistoryLimit nil }}
-    unsuccessfulRunHistoryLimit: {{ .Values.rollout.analysis.unsuccessfulRunHistoryLimit }}
-    {{- end }}
-  {{- end }}
-  strategy:
-    blueGreen:
-      activeService: {{ include "domestique.fullname" . }}
-      previewService: {{ include "domestique.fullname" . }}-preview
-      autoPromotionEnabled: {{ .Values.rollout.blueGreen.autoPromotionEnabled }}
-      scaleDownDelaySeconds: {{ .Values.rollout.blueGreen.scaleDownDelaySeconds }}
-      {{- with .Values.rollout.blueGreen.prePromotionAnalysis.templates }}
-      prePromotionAnalysis:
-        templates:
-          {{- toYaml . | nindent 10 }}
-        {{- with $.Values.rollout.blueGreen.prePromotionAnalysis.args }}
-        args:
-          {{- toYaml . | nindent 10 }}
-        {{- end }}
-      {{- end }}
-      {{- with .Values.rollout.blueGreen.postPromotionAnalysis.templates }}
-      postPromotionAnalysis:
-        templates:
-          {{- toYaml . | nindent 10 }}
-        {{- with $.Values.rollout.blueGreen.postPromotionAnalysis.args }}
-        args:
-          {{- toYaml . | nindent 10 }}
-        {{- end }}
-      {{- end }}
-  {{- else }}
   strategy:
     {{- toYaml .Values.strategy | nindent 4 }}
-  {{- end }}
   selector:
     matchLabels:
       {{- include "domestique.selectorLabels" . | nindent 6 }}
