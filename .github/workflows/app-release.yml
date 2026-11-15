@@ -1,17 +1,28 @@
 name: Follow app releases
 
-# Points the chart at each new Domestique release, so a `v*` tag in
+# Points the chart at a new Domestique release, so a `v*` tag in
 # wncservices/domestique reaches Kargo (whose Warehouse watches this Helm
 # repository, not the image) without a hand-written bump. It makes exactly the
 # change the manual "Release app X (chart Y)" commits made: `appVersion` to the
 # new release, chart `version` up one patch.
 #
-# Pull, not push: the app repo is public, so reading its latest release needs no
-# credential, and nothing outside this repo ever holds write access to it.
+# Started by the app repo's image workflow once the release image is pushed
+# (wncservices/domestique `.github/workflows/image.yml`, job `chart`), using the
+# `wncservices-dispatch` GitHub App: Actions write on this repo only. So the app
+# repo can ask for this run but cannot push here; the commit below is made with
+# this repo's own GITHUB_TOKEN. Run it by hand the same way to re-try:
+#   gh workflow run app-release.yml -f version=v2.17.4
+#
+# The version comes in as an input rather than from the app's "latest release":
+# the app's GitHub Release is created by a separate workflow in parallel, so at
+# dispatch time it may not exist yet.
 on:
-  schedule:
-    - cron: "7,22,37,52 * * * *"
   workflow_dispatch:
+    inputs:
+      version:
+        description: App release tag, e.g. v2.17.4
+        required: true
+        type: string
 
 permissions: {}
 
@@ -21,7 +32,7 @@ concurrency:
 
 jobs:
   bump:
-    name: Bump to the latest app release
+    name: Bump to app ${{ inputs.version }}
     runs-on: ubuntu-latest
     permissions:
       # Commits the bump to main.
@@ -37,26 +48,34 @@ jobs:
         with:
           ref: main
 
-      # `releases/latest` skips drafts and pre-releases. The tag is checked
-      # against a plain x.y.z before it goes anywhere near Chart.yaml.
-      - name: Compare with the latest app release
+      # The input is checked against a plain vX.Y.Z before it goes anywhere near
+      # Chart.yaml, and the image it names must exist: the chart would deploy it.
+      - name: Compare with the current appVersion
         id: check
+        env:
+          TAG: ${{ inputs.version }}
         run: |
-          tag=$(gh api repos/wncservices/domestique/releases/latest --jq .tag_name)
-          app="${tag#v}"
+          app="${TAG#v}"
           if ! [[ "$app" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::latest release tag '$tag' is not vX.Y.Z"; exit 1
+            echo "::error::version '$TAG' is not vX.Y.Z"; exit 1
+          fi
+          token=$(curl -sf "https://ghcr.io/token?scope=repository:wncservices/domestique:pull&service=ghcr.io" | jq -r .token)
+          code=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer ${token}" \
+            -H "Accept: application/vnd.oci.image.index.v1+json,application/vnd.docker.distribution.manifest.list.v2+json" \
+            "https://ghcr.io/v2/wncservices/domestique/manifests/${app}")
+          if [ "$code" != "200" ]; then
+            echo "::error::ghcr.io/wncservices/domestique:${app} not found (HTTP ${code})"; exit 1
           fi
           current=$(sed -n 's/^appVersion: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' "$CHART")
           chart=$(sed -n 's/^version: *\([0-9.]*\) *$/\1/p' "$CHART")
           if ! [[ "$chart" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "::error::could not read the chart version from $CHART"; exit 1
           fi
-          # Only move forward: a release older than (or equal to) appVersion is
-          # left alone, so a hand bump or a re-run is never undone.
+          # Only move forward: an older (or the same) release is left alone, so
+          # a hand bump or a re-run is never undone.
           newest=$(printf '%s\n%s\n' "$current" "$app" | sort -V | tail -n1)
           if [ "$app" = "$current" ] || [ "$newest" != "$app" ]; then
-            echo "appVersion $current is current (latest release $tag)"
+            echo "appVersion $current is already at or past $TAG"
             exit 0
           fi
           next="${chart%.*}.$(( ${chart##*.} + 1 ))"
