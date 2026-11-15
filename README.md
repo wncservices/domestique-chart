@@ -20,7 +20,7 @@ helm repo update
 |---|---|
 | `charts/domestique/` | The chart itself — `Chart.yaml`, `values.yaml`, `templates/`, worked examples under `ci/` |
 | `.github/workflows/chart-release.yml` | Publishes to GitHub Pages via `chart-releaser-action` on every push to `main` that bumps `charts/domestique/Chart.yaml`'s `version` |
-| `.github/workflows/app-release.yml` | Every 15 minutes (and on demand), points `appVersion` at the latest Domestique release, bumps the chart patch version, and starts `chart-release.yml` |
+| `.github/workflows/app-release.yml` | Started by the app repo when a release image is pushed: points `appVersion` at that release, bumps the chart patch version, and starts `chart-release.yml` |
 | `.github/workflows/ci.yml` | Lints and renders the chart against every example in `ci/`, and validates the rendered config against a real `domestique` binary |
 
 ## Releasing
@@ -30,8 +30,9 @@ the version hasn't changed, so this is the only thing that actually triggers a p
 tracks the application release this chart deploys by default (`image.tag` falls back to it); on
 its own it does not trigger anything.
 
-A new Domestique release needs no hand bump: `app-release.yml` notices it within about 15 minutes,
-sets `appVersion`, bumps the chart's patch version and publishes the chart, which is what Kargo
-picks up. To ship it sooner, run that workflow by hand (`gh workflow run app-release.yml`). Chart
-changes of your own still bump `version` by hand, as above; the workflow only ever moves
-`appVersion` forward.
+A new Domestique release needs no hand bump: once its image is pushed, the app repo's image
+workflow starts `app-release.yml` here (through the `wncservices-dispatch` GitHub App, which can
+start workflows in this repo and nothing else). That run sets `appVersion`, bumps the chart's patch
+version and publishes the chart, which is what Kargo picks up. If it didn't happen, start it by hand:
+`gh workflow run app-release.yml -f version=vX.Y.Z`. Chart changes of your own still bump `version`
+by hand, as above; the workflow only ever moves `appVersion` forward.
