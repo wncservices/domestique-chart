@@ -7,16 +7,18 @@ name: Follow app releases
 # new release, chart `version` up one patch.
 #
 # Started by the app repo's image workflow once the release image is pushed
-# (wncservices/domestique `.github/workflows/image.yml`, job `chart`), using the
-# `wncservices-dispatch` GitHub App: Actions write on this repo only. So the app
-# repo can ask for this run but cannot push here; the commit below is made with
-# this repo's own GITHUB_TOKEN. Run it by hand the same way to re-try:
+# (wncservices/domestique `.github/workflows/image.yml`, job `chart`): it sends a
+# `repository_dispatch` of type `app-release` with the version, using a token
+# from the org's `wncservices-writer` GitHub App narrowed to this repo. The
+# commit below is made with this repo's own GITHUB_TOKEN. Re-try by hand with:
 #   gh workflow run app-release.yml -f version=v2.17.4
 #
-# The version comes in as an input rather than from the app's "latest release":
-# the app's GitHub Release is created by a separate workflow in parallel, so at
-# dispatch time it may not exist yet.
+# The version comes in with the event rather than from the app's "latest
+# release": the app's GitHub Release is created by a separate workflow in
+# parallel, so at dispatch time it may not exist yet.
 on:
+  repository_dispatch:
+    types: [app-release]
   workflow_dispatch:
     inputs:
       version:
@@ -32,7 +34,7 @@ concurrency:
 
 jobs:
   bump:
-    name: Bump to app ${{ inputs.version }}
+    name: Bump to app ${{ inputs.version || github.event.client_payload.version }}
     runs-on: ubuntu-latest
     permissions:
       # Commits the bump to main.
@@ -53,7 +55,7 @@ jobs:
       - name: Compare with the current appVersion
         id: check
         env:
-          TAG: ${{ inputs.version }}
+          TAG: ${{ inputs.version || github.event.client_payload.version }}
         run: |
           app="${TAG#v}"
           if ! [[ "$app" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
