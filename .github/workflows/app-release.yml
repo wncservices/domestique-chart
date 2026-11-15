@@ -1,0 +1,102 @@
+name: Follow app releases
+
+# Points the chart at each new Domestique release, so a `v*` tag in
+# wncservices/domestique reaches Kargo (whose Warehouse watches this Helm
+# repository, not the image) without a hand-written bump. It makes exactly the
+# change the manual "Release app X (chart Y)" commits made: `appVersion` to the
+# new release, chart `version` up one patch.
+#
+# Pull, not push: the app repo is public, so reading its latest release needs no
+# credential, and nothing outside this repo ever holds write access to it.
+on:
+  schedule:
+    - cron: "7,22,37,52 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: app-release
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    name: Bump to the latest app release
+    runs-on: ubuntu-latest
+    permissions:
+      # Commits the bump to main.
+      contents: write
+      # Starts chart-release.yml. A push made with GITHUB_TOKEN triggers no
+      # workflows, but a workflow_dispatch made with it does.
+      actions: write
+    env:
+      CHART: charts/domestique/Chart.yaml
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+
+      # `releases/latest` skips drafts and pre-releases. The tag is checked
+      # against a plain x.y.z before it goes anywhere near Chart.yaml.
+      - name: Compare with the latest app release
+        id: check
+        run: |
+          tag=$(gh api repos/wncservices/domestique/releases/latest --jq .tag_name)
+          app="${tag#v}"
+          if ! [[ "$app" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::latest release tag '$tag' is not vX.Y.Z"; exit 1
+          fi
+          current=$(sed -n 's/^appVersion: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' "$CHART")
+          chart=$(sed -n 's/^version: *\([0-9.]*\) *$/\1/p' "$CHART")
+          if ! [[ "$chart" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::could not read the chart version from $CHART"; exit 1
+          fi
+          # Only move forward: a release older than (or equal to) appVersion is
+          # left alone, so a hand bump or a re-run is never undone.
+          newest=$(printf '%s\n%s\n' "$current" "$app" | sort -V | tail -n1)
+          if [ "$app" = "$current" ] || [ "$newest" != "$app" ]; then
+            echo "appVersion $current is current (latest release $tag)"
+            exit 0
+          fi
+          next="${chart%.*}.$(( ${chart##*.} + 1 ))"
+          echo "app $current -> $app, chart $chart -> $next"
+          {
+            echo "app=$app"
+            echo "chart=$next"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Bump Chart.yaml
+        if: steps.check.outputs.app
+        env:
+          APP: ${{ steps.check.outputs.app }}
+          NEXT: ${{ steps.check.outputs.chart }}
+        run: |
+          sed -i -e "s/^version: .*/version: ${NEXT}/" \
+                 -e "s/^appVersion: .*/appVersion: \"${APP}\"/" "$CHART"
+          git diff --exit-code --quiet "$CHART" && { echo "::error::nothing changed"; exit 1; }
+          git diff "$CHART"
+
+      # ci.yml does not run on this push (GITHUB_TOKEN), so check here that the
+      # chart still lints and renders. Only two version strings changed.
+      - uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
+        if: steps.check.outputs.app
+      - name: Lint and render
+        if: steps.check.outputs.app
+        run: |
+          helm lint charts/domestique
+          for values in charts/domestique/ci/*-values.yaml; do
+            helm template dom charts/domestique -f "$values" > /dev/null
+          done
+
+      - name: Commit and publish
+        if: steps.check.outputs.app
+        env:
+          APP: ${{ steps.check.outputs.app }}
+          NEXT: ${{ steps.check.outputs.chart }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Release app ${APP} (chart ${NEXT})" -- "$CHART"
+          git push origin HEAD:main
+          gh workflow run chart-release.yml --ref main
