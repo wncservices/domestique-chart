@@ -8,6 +8,12 @@ name: Follow app releases
 #
 # Pull, not push: the app repo is public, so reading its latest release needs no
 # credential, and nothing outside this repo ever holds write access to it.
+#
+# `main` is protected (pull request, one approval, the "Helm chart" check), and
+# GITHUB_TOKEN can't bypass that. So this opens the bump as a pull request on
+# `release/app-<version>` and starts ci.yml on it; merging it is a person's
+# click, and that push to main is what runs chart-release.yml. Needs "Allow
+# GitHub Actions to create and approve pull requests" (repo and organisation).
 on:
   schedule:
     - cron: "7,22,37,52 * * * *"
@@ -24,10 +30,13 @@ jobs:
     name: Bump to the latest app release
     runs-on: ubuntu-latest
     permissions:
-      # Commits the bump to main.
+      # Pushes the release/app-<version> branch.
       contents: write
-      # Starts chart-release.yml. A push made with GITHUB_TOKEN triggers no
-      # workflows, but a workflow_dispatch made with it does.
+      # Opens the pull request.
+      pull-requests: write
+      # Starts ci.yml on that branch. A pull request opened with GITHUB_TOKEN
+      # triggers no workflows, so the required "Helm chart" check would never
+      # run on it; a workflow_dispatch made with it does.
       actions: write
     env:
       CHART: charts/domestique/Chart.yaml
@@ -56,6 +65,13 @@ jobs:
             "https://ghcr.io/v2/wncservices/domestique/manifests/${app}")
           if [ "$code" != "200" ]; then
             echo "::notice::ghcr.io/wncservices/domestique:${app} not pushed yet (HTTP ${code}); next run"
+            exit 0
+          fi
+          # A bump already waiting for review (opened here or by hand, same
+          # branch name) is left alone.
+          open=$(gh pr list --head "release/app-${app}" --state open --json number --jq length)
+          if [ "$open" != "0" ]; then
+            echo "::notice::a pull request for release/app-${app} is already open"
             exit 0
           fi
           current=$(sed -n 's/^appVersion: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' "$CHART")
@@ -88,8 +104,8 @@ jobs:
           git diff --exit-code --quiet "$CHART" && { echo "::error::nothing changed"; exit 1; }
           git diff "$CHART"
 
-      # ci.yml does not run on this push (GITHUB_TOKEN), so check here that the
-      # chart still lints and renders. Only two version strings changed.
+      # Fail here rather than open a pull request that can't pass. ci.yml then
+      # runs the full check (including the app's own config validation) on it.
       - uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
         if: steps.check.outputs.app
       - name: Lint and render
@@ -100,14 +116,20 @@ jobs:
             helm template dom charts/domestique -f "$values" > /dev/null
           done
 
-      - name: Commit and publish
+      - name: Open the pull request
         if: steps.check.outputs.app
         env:
           APP: ${{ steps.check.outputs.app }}
           NEXT: ${{ steps.check.outputs.chart }}
         run: |
+          branch="release/app-${APP}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
           git commit -m "Release app ${APP} (chart ${NEXT})" -- "$CHART"
-          git push origin HEAD:main
-          gh workflow run chart-release.yml --ref main
+          # Force: a leftover branch from a closed pull request is ours to replace.
+          git push --force origin "HEAD:refs/heads/${branch}"
+          gh pr create --base main --head "$branch" \
+            --title "Release app ${APP} (chart ${NEXT})" \
+            --body "Points the chart at Domestique [v${APP}](https://github.com/wncservices/domestique/releases/tag/v${APP}). Opened by \`app-release.yml\`; merging it publishes chart ${NEXT}, which Kargo deploys to dev."
+          gh workflow run ci.yml --ref "$branch"

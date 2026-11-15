@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  # app-release.yml starts this on the bump branch it opens: a pull request it
+  # opens with GITHUB_TOKEN triggers no workflow, and "Helm chart" is required.
+  workflow_dispatch:
 
 jobs:
   chart:
